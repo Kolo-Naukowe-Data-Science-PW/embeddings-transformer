@@ -1,0 +1,8 @@
+datasets
+git+https://github.com/Nospoko/midi-tokenizers
+numpy
+pandas
+plotly
+scikit-learn
+torch
+tqdm

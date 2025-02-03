@@ -1,4 +1,4 @@
-__version__ = "0.1"
+__version__ = "1.0"
 __author__ = "matikosowy"
 
-__all__ = ["transformer", "dataset", "data_gather", "visualize", "trainer"]
+__all__ = ["transformer", "dataset", "visualize", "train"]
