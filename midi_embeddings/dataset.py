@@ -120,7 +120,7 @@ class MIDIDatasetPresaved(Dataset):
         """
         self.max_seq_len = max_seq_len
         self.return_info = return_info
-        self.save_path = f"data/{split}_tokenized_{max_seq_len}.json"
+        self.save_path = f"data/{split}_tokenized_{max_seq_len}_{limit}.json"
 
         if not Path(self.save_path).parent.exists():
             Path(self.save_path).parent.mkdir(parents=True)
@@ -131,12 +131,24 @@ class MIDIDatasetPresaved(Dataset):
             self._load_tokenized()
             if limit:
                 self.dataset = self.dataset[:limit]
+            # Initialize tokenizer from path
+            self._setup_tokenizer(tokenizer_path)
             return
 
         # Load and process original dataset
         self._load_and_process_original(split, limit, tokenizer_path)
         self._save_tokenized()
         self._load_tokenized()
+
+    def _setup_tokenizer(self, tokenizer_path: str):
+        """Initialize tokenizer"""
+        base_tokenizer = ExponentialTimeTokenizer()
+        if tokenizer_path is None:
+            self.tokenizer = AwesomeMidiTokenizer(base_tokenizer=base_tokenizer)
+            self.tokenizer.train(self.dataset)
+            self.tokenizer.save_tokenizer("awesome.json")
+        else:
+            self.tokenizer = AwesomeMidiTokenizer(base_tokenizer=base_tokenizer).from_file(tokenizer_path)
 
     def _load_and_process_original(self, split, limit, tokenizer_path):
         """Load and tokenize original dataset"""
@@ -153,13 +165,7 @@ class MIDIDatasetPresaved(Dataset):
             self.dataset = self.dataset.shuffle(seed=42).select(range(limit))
 
         # Tokenizer setup
-        base_tokenizer = ExponentialTimeTokenizer()
-        if tokenizer_path is None:
-            self.tokenizer = AwesomeMidiTokenizer(base_tokenizer=base_tokenizer)
-            self.tokenizer.train(self.dataset)
-            self.tokenizer.save_tokenizer("awesome.json")
-        else:
-            self.tokenizer = AwesomeMidiTokenizer(base_tokenizer=base_tokenizer).from_file(tokenizer_path)
+        self._setup_tokenizer(tokenizer_path)
 
         # Tokenization
         original_columns = self.dataset.column_names
@@ -167,8 +173,8 @@ class MIDIDatasetPresaved(Dataset):
             self._tokenize_example,
             remove_columns=[col for col in original_columns if col != "source"],
             num_proc=4,
-            desc="Tokenizing...",
-            load_from_cache_file=False,
+            desc=f"Tokenizing {split} data...",
+            load_from_cache_file=True,
         )
 
     def _tokenize_example(self, example):

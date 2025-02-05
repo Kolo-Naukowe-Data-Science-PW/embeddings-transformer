@@ -5,9 +5,11 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 import torch.optim as optim
-from torch.amp import GradScaler
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import Dataset, DataLoader
+
+if torch.cuda.is_available():
+    from torch.amp import GradScaler
 
 from midi_embeddings.transformer import generate_causal_mask
 
@@ -39,7 +41,11 @@ def train_one_epoch(
     """
     model.train()
     total_loss = 0.0
-    scaler = GradScaler()
+
+    if torch.cuda.is_available():
+        scaler = GradScaler()
+    else:
+        scaler = None
 
     progress_bar = tqdm(dataloader, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False)
 
@@ -54,19 +60,32 @@ def train_one_epoch(
 
         optimizer.zero_grad()
 
-        # Forward pass
-        with torch.amp.autocast("cuda"):
+        if scaler is not None:
+            with torch.amp.autocast("cuda"):
+                # Forward pass
+                outputs = model(input_seq, src_mask)
+                # Compute loss
+                loss = criterion(outputs.view(-1, model.vocab_size), target_seq.reshape(-1))
+
+            # Backprop
+            scaler.scale(loss).backward()
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+
+            scaler.step(optimizer)
+            scaler.update()
+
+        else:
+            # Forward pass
             outputs = model(input_seq, src_mask)
             # Compute loss
             loss = criterion(outputs.view(-1, model.vocab_size), target_seq.reshape(-1))
 
-        # Backprop
-        scaler.scale(loss).backward()
-        scaler.unscale_(optimizer)
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            # Backprop
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            optimizer.step()
 
-        scaler.step(optimizer)
-        scaler.update()
         scheduler.step()
 
         # Update total loss
