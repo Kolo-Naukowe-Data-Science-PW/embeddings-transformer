@@ -1,3 +1,16 @@
+"""
+Training Module (train.py)
+--------------------------
+This module contains functions for training, validating and evaluating a
+MIDI-based transformer model. It includes:
+
+- `train_one_epoch`: Runs a single epoch of training.
+- `validate`: Evaluates the model on validation data.
+- `train_model`: Handles full training lifecycle.
+- `evaluate`: Evaluates the model on test data.
+- `resume_training`: Resumes training from a checkpoint.
+"""
+
 from pathlib import Path
 from typing import Union
 
@@ -154,6 +167,7 @@ def train_model(
     optimizer: optim.Optimizer = None,
     scheduler: torch.optim.lr_scheduler._LRScheduler = None,
     start_epoch: int = 0,
+    prev_val_loss: float = float("inf"),
 ) -> nn.Module:
     """Trains the model using defined configuration
 
@@ -167,6 +181,7 @@ def train_model(
         optimizer (optim.Optimizer, optional): Existing optimizer. Defaults to None.
         scheduler (torch.optim.lr_scheduler, optional): Existing scheduler. Defaults to None.
         start_epoch (int, optional): Starting epoch for resuming training. Defaults to 0.
+        prev_val_loss (float, optional): Previous best validation loss. Defaults to float("inf").
 
     Returns:
         nn.Module: Trained model.
@@ -209,7 +224,7 @@ def train_model(
     criterion = nn.CrossEntropyLoss()
 
     # Training loop
-    best_val_loss = float("inf")
+    best_val_loss = prev_val_loss
 
     for epoch in range(start_epoch, start_epoch + config["epochs"]):
         # Training phase
@@ -255,7 +270,11 @@ def train_model(
     return model
 
 
-def evaluate(model: nn.Module, test_dataset: torch.utils.data.Dataset, device: torch.device) -> float:
+def evaluate(
+    model: nn.Module,
+    test_dataset: torch.utils.data.Dataset,
+    device: torch.device,
+) -> float:
     """Evaluates the model on the test dataset
 
     Args:
@@ -284,6 +303,7 @@ def resume_training(
     device: torch.device,
     train_dataset: Dataset,
     val_dataset: Dataset,
+    epochs: int = None,
 ) -> nn.Module:
     """Resume training from a checkpoint
 
@@ -303,6 +323,13 @@ def resume_training(
 
     config = checkpoint["config"]
     start_epoch = checkpoint["epoch"] + 1  # Start from the next epoch
+    val_loss = checkpoint["val_loss"]
+
+    # Adjust epochs
+    if epochs is not None:
+        config["epochs"] = epochs
+    else:
+        config["epochs"] -= start_epoch
 
     # Initialize optimizer and load state
     optimizer = optim.AdamW(
@@ -336,6 +363,7 @@ def resume_training(
         optimizer=optimizer,
         scheduler=scheduler,
         start_epoch=start_epoch,
+        prev_val_loss=val_loss,
     )
 
     return model

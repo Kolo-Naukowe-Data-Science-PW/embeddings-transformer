@@ -1,5 +1,16 @@
+"""
+Dataset Module (dataset.py)
+---------------------------
+This module defines datasets for training and evaluating MIDI embeddings
+from the MAESTRO dataset. It includes:
+
+- `MIDIDatasetDynamic`: Dynamically loads and tokenizes MIDI data.
+- `MIDIDatasetPresaved`: Loads pre-tokenized MIDI data for efficiency.
+"""
+
 import json
 from pathlib import Path
+from typing import Any, Dict, Union
 
 import torch
 import pandas as pd
@@ -9,6 +20,10 @@ from midi_tokenizers import AwesomeMidiTokenizer, ExponentialTimeTokenizer
 
 
 class MIDIDatasetDynamic(Dataset):
+    """A dataset class that dynamically loads and tokenizes MIDI data
+    from the MAESTRO dataset using a specified tokenizer.
+    """
+
     def __init__(
         self,
         max_seq_len: int,
@@ -17,14 +32,14 @@ class MIDIDatasetDynamic(Dataset):
         limit: int = None,
         return_info: bool = False,
     ):
-        """MAESTRO dataset for MIDI embeddings
+        """Dynamic data loading and processing MAESTRO dataset for MIDI embeddings
 
         Args:
-            max_seq_len: Maximum sequence length for truncation/padding
-            split: Dataset split (train/test/validation)
-            tokenizer_path: Path to pre-trained tokenizer config. If None, train tokenizer
-            limit: Optional limit for quick testing
-            return_info: return additional information about each sample
+            max_seq_len (int): Maximum sequence length for truncation/padding
+            split (str): Dataset split (train/test/validation)
+            tokenizer_path (str, optional): Path to pre-trained tokenizer config. If None, train tokenizer
+            limit (int, optional): Optional sample limit for quick testing
+            return_info (bool, optional): return additional information about each sample
         """
         self.max_seq_len = max_seq_len
         self.return_info = return_info
@@ -60,10 +75,12 @@ class MIDIDatasetDynamic(Dataset):
             num_proc=4,
         )
 
-    def __len__(self):
+    def __len__(self) -> int:
+        """Returns the total number of samples in the dataset."""
         return len(self.dataset)
 
-    def _preprocess_example(self, example):
+    def _preprocess_example(self, example: dict) -> dict:
+        """Preprocesses a single example from the dataset."""
         # Tokenize notes
         notes = pd.DataFrame(example["notes"])
         tokens = self.tokenizer.tokenize(notes)
@@ -80,7 +97,8 @@ class MIDIDatasetDynamic(Dataset):
             "token_ids": token_ids,
         }
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> Union[torch.Tensor, Dict[str, Any]]:
+        """Returns a tokenized sample at the given index."""
         example = self.dataset[idx]
         token_ids = torch.tensor(example["token_ids"], dtype=torch.int64)
         info_dict = json.loads(example["source"])
@@ -94,11 +112,16 @@ class MIDIDatasetDynamic(Dataset):
             return token_ids
 
     @property
-    def vocab_size(self):
+    def vocab_size(self) -> int:
+        """Returns the vocabulary size of the tokenizer."""
         return self.tokenizer.vocab_size
 
 
 class MIDIDatasetPresaved(Dataset):
+    """A dataset class that loads pre-tokenized MIDI sequences from a JSON file
+    for improved efficiency during training.
+    """
+
     def __init__(
         self,
         max_seq_len: int,
@@ -108,19 +131,19 @@ class MIDIDatasetPresaved(Dataset):
         return_info: bool = False,
         force_retokenize: bool = False,
     ):
-        """Dataset that saves tokenized data for faster subsequent loads
+        """Dataset that saves and loads tokenized MAESTRO dataset for faster subsequent loads
 
         Args:
-            max_seq_len: Maximum sequence length for truncation/padding
-            split: Dataset split (train/test/validation)
-            tokenizer_path: Path to pre-trained tokenizer config. If None, train tokenizer
-            limit: Optional limit for quick testing
-            return_info: return additional information about each sample
-            force_retokenize: Force re-tokenization of the dataset
+            max_seq_len (int): Maximum sequence length for truncation/padding
+            split (str): Dataset split (train/test/validation)
+            tokenizer_path (str, optional): Path to pre-trained tokenizer config. If None, train tokenizer
+            limit (int, optional): Optional sample limit for quick testing
+            return_info (bool, optional): return additional information about each sample
+            force_retokenize (bool, optional): Force re-tokenization of the dataset
         """
         self.max_seq_len = max_seq_len
         self.return_info = return_info
-        self.save_path = f"data/{split}_tokenized_{max_seq_len}_{limit}.json"
+        self.save_path = f"data/{split}_tokenized_{max_seq_len}_{limit if limit is not None else 'full'}.json"
 
         if not Path(self.save_path).parent.exists():
             Path(self.save_path).parent.mkdir(parents=True)
@@ -150,7 +173,7 @@ class MIDIDatasetPresaved(Dataset):
         else:
             self.tokenizer = AwesomeMidiTokenizer(base_tokenizer=base_tokenizer).from_file(tokenizer_path)
 
-    def _load_and_process_original(self, split, limit, tokenizer_path):
+    def _load_and_process_original(self, split: str, limit: int, tokenizer_path: str):
         """Load and tokenize original dataset"""
         # Dataset loading
         if split == "all":
@@ -177,7 +200,7 @@ class MIDIDatasetPresaved(Dataset):
             load_from_cache_file=True,
         )
 
-    def _tokenize_example(self, example):
+    def _tokenize_example(self, example: dict) -> dict:
         """Tokenize single example"""
         try:
             # Convert notes and tokenize
@@ -213,9 +236,11 @@ class MIDIDatasetPresaved(Dataset):
             self.dataset = json.load(f)
 
     def __len__(self):
+        """Return the total number of samples in the dataset."""
         return len(self.dataset)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> Union[torch.Tensor, Dict[str, Any]]:
+        """Return a tokenized sample at the given index."""
         example = self.dataset[idx]
         token_ids = torch.tensor(example["token_ids"], dtype=torch.int64)
 
@@ -230,10 +255,12 @@ class MIDIDatasetPresaved(Dataset):
         return {"token_ids": token_ids, "info": info}
 
     @property
-    def vocab_size(self):
+    def vocab_size(self) -> int:
+        """Return the vocabulary size of the tokenizer."""
         return self.tokenizer.vocab_size
 
 
+# Test the dataset classes
 if __name__ == "__main__":
     # Test dynamic dataset
     dataset = MIDIDatasetDynamic(

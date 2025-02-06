@@ -1,3 +1,13 @@
+"""
+Transformer Model Module (transformer.py)
+-----------------------------------------
+This module implements the Transformer model for processing MIDI data.
+It includes:
+
+- `MIDITransformerEncoder`: A transformer-based encoder for MIDI sequences.
+- `generate_causal_mask`: Generates a causal mask for autoregressive training.
+"""
+
 import torch
 import torch.nn as nn
 

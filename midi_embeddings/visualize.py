@@ -1,3 +1,17 @@
+"""
+Visualization Module (visualize.py)
+-----------------------------------
+This module provides tools for visualizing MIDI song embeddings using
+Plotly and t-SNE. It includes:
+
+- `get_song_embedding`: Extracts embeddings from a trained model.
+- `prepare_embeddings`: Computes embeddings and reduces dimensions using t-SNE.
+- `plot_interactive`: Creates an interactive scatter plot.
+- `visualize_embeddings`: A utility function to load data, compute embeddings
+  and visualize them.
+"""
+
+
 import torch
 import numpy as np
 import pandas as pd
@@ -120,7 +134,7 @@ def visualize_embeddings(
     model: nn.Module,
     device: torch.device,
     max_seq_len: int = 2048,
-    limit: int = 100,
+    limit: int = None,
     file_name: str = "embeddings.html",
 ):
     """Simple interface for visualizing song embeddings
@@ -142,6 +156,7 @@ def visualize_embeddings(
     plot_interactive(embeddings_2d, titles, composers, file_name)
 
 
+# Main function to run the visualization manually
 def main():
     # Device setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

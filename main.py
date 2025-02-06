@@ -10,17 +10,19 @@ def main():
     # Configuration settings
     config = {
         "max_seq_len": 2048,
-        "embed_dim": 348,
+        "embed_dim": 384,
         "nhead": 6,
-        "num_layers": 4,
+        "num_layers": 6,
         "batch_size": 8,
-        "epochs": 100,
-        "learning_rate": 1e-4,
-        "weight_decay": 1e-3,
-        "dropout": 0.3,
+        "epochs": 50,
+        "learning_rate": 3e-4,
+        "weight_decay": 0.1,
+        "dropout": 0.2,
     }
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    MODEL_NAME = "model"
+
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     torch.manual_seed(42)
 
     # Initialize datasets
@@ -36,12 +38,6 @@ def main():
         tokenizer_path="awesome.json",
     )
 
-    test_dataset = MIDIDatasetDynamic(
-        split="test",
-        max_seq_len=config["max_seq_len"],
-        tokenizer_path="awesome.json",
-    )
-
     # Initialize model
     model = MIDITransformerEncoder(
         vocab_size=train_dataset.vocab_size,
@@ -50,7 +46,7 @@ def main():
         num_layers=config["num_layers"],
         max_seq_len=config["max_seq_len"],
         dropout=config["dropout"],
-    ).to(device)
+    ).to(DEVICE)
 
     # Train the model
     model = train_model(
@@ -58,15 +54,28 @@ def main():
         train_dataset,
         val_dataset,
         config,
-        device,
-        model_name="model_new.pth",
+        DEVICE,
+        model_name=MODEL_NAME,
     )
 
-    test_loss, perplexity = evaluate(model, test_dataset, device)
+    # Load the best model
+    best_checkpoint = torch.load(f"models/{MODEL_NAME}.pth", map_location=DEVICE)
+    model.load_state_dict(best_checkpoint["model_state_dict"])
+    model.eval()
+
+    # Evaluate the model on the test dataset
+    test_dataset = MIDIDatasetDynamic(
+        split="test",
+        max_seq_len=config["max_seq_len"],
+        tokenizer_path="awesome.json",
+    )
+
+    test_loss, perplexity = evaluate(model, test_dataset, DEVICE)
     print(f"Test Loss: {test_loss: .4f}, Perplexity: {perplexity: .4f}")
 
-    # Visualize embeddings
-    visualize_embeddings(model, device, max_seq_len=config["max_seq_len"], file_name="embeddings.html", limit=1000)
+    # Visualize embeddings for whole dataset
+    print("Visualizing embeddings...")
+    visualize_embeddings(model, DEVICE, max_seq_len=config["max_seq_len"], file_name="embeddings.html")
 
 
 if __name__ == "__main__":
