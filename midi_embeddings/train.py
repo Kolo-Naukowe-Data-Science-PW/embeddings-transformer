@@ -69,7 +69,7 @@ def train_one_epoch(
         input_seq = batch[:, :-1]
         target_seq = batch[:, 1:]
 
-        src_mask = generate_causal_mask(input_seq.size(1), device)
+        src_mask = generate_causal_mask(seq_len=input_seq.size(1), device=device)
 
         optimizer.zero_grad()
 
@@ -107,8 +107,8 @@ def train_one_epoch(
 
         progress_bar.set_postfix(
             {
-                "loss": f"{loss.item(): .4f}",
-                "avg_loss": f"{total_loss / (batch_idx + 1): .4f}",
+                "avg_loss": f"{loss.item(): .4f}",
+                "batch_loss": f"{total_loss / (batch_idx + 1): .4f}",
                 "lr": f"{current_lr: .2e}",
             }
         )
@@ -145,7 +145,7 @@ def validate(
             input_seq = batch[:, :-1]
             target_seq = batch[:, 1:]
 
-            src_mask = generate_causal_mask(input_seq.size(1), device)
+            src_mask = generate_causal_mask(seq_len=input_seq.size(1), device=device)
 
             # Pass through model and calculate: loss, perplexity
             outputs = model(input_seq, src_mask)

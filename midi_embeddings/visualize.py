@@ -67,8 +67,12 @@ def prepare_embeddings(
 
     # For each song: get embedding and store it with info
     for i in range(len(dataset)):
-        song = dataset[i]["token_ids"]
-        embedding = get_song_embedding(model, song, device)
+        song_tokens = dataset[i]["token_ids"]
+        embedding = get_song_embedding(
+            model=model,
+            song_tokens=song_tokens,
+            device=device,
+        )
         song_embeddings.append(embedding)
 
         info = dataset[i]["info"]
@@ -103,7 +107,12 @@ def plot_interactive(
     colors = px.colors.qualitative.Set3 + px.colors.qualitative.Pastel + px.colors.qualitative.Bold
 
     df = pd.DataFrame(
-        {"x": embeddings_2d[:, 0], "y": embeddings_2d[:, 1], "title": song_titles, "composer": composers},
+        {
+            "x": embeddings_2d[:, 0],
+            "y": embeddings_2d[:, 1],
+            "title": song_titles,
+            "composer": composers,
+        }
     )
 
     fig = px.scatter(
@@ -148,12 +157,26 @@ def visualize_embeddings(
     """
     # Load dataset with metadata
     dataset = MIDIDatasetPresaved(
-        split="all", max_seq_len=max_seq_len, tokenizer_path="awesome.json", return_info=True, limit=limit
+        split="all",
+        max_seq_len=max_seq_len,
+        tokenizer_path="awesome.json",
+        return_info=True,
+        limit=limit,
     )
 
     # Generate and plot embeddings
-    embeddings_2d, titles, composers = prepare_embeddings(model, dataset, device)
-    plot_interactive(embeddings_2d, titles, composers, file_name)
+    embeddings_2d, titles, composers = prepare_embeddings(
+        model=model,
+        dataset=dataset,
+        device=device,
+    )
+
+    plot_interactive(
+        embeddings_2d=embeddings_2d,
+        song_titles=titles,
+        composers=composers,
+        file_name=file_name,
+    )
 
 
 # Main function to run the visualization manually
@@ -185,10 +208,18 @@ def main():
     model.eval()
 
     # Prepare the data
-    embeddings_2d, song_titles, composers = prepare_embeddings(model, dataset, device)
+    embeddings_2d, song_titles, composers = prepare_embeddings(
+        model=model,
+        dataset=dataset,
+        device=device,
+    )
 
     # Create and save visualization
-    plot_interactive(embeddings_2d, song_titles, composers)
+    plot_interactive(
+        embeddings_2d=embeddings_2d,
+        song_titles=song_titles,
+        composers=composers,
+    )
 
 
 if __name__ == "__main__":

@@ -61,6 +61,7 @@ class MIDIDatasetDynamic(Dataset):
 
         if tokenizer_path is None:
             tokenizer_path = "awesome.json"
+            print("No tokenizer found, training from scratch...")
             tokenizer = AwesomeMidiTokenizer(base_tokenizer=base_tokenizer)
             tokenizer.train(self.dataset)
             tokenizer.save_tokenizer(tokenizer_path)
@@ -167,6 +168,7 @@ class MIDIDatasetPresaved(Dataset):
         """Initialize tokenizer"""
         base_tokenizer = ExponentialTimeTokenizer()
         if tokenizer_path is None:
+            print("No tokenizer found, training from scratch..")
             self.tokenizer = AwesomeMidiTokenizer(base_tokenizer=base_tokenizer)
             self.tokenizer.train(self.dataset)
             self.tokenizer.save_tokenizer("awesome.json")

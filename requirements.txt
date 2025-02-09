@@ -4,5 +4,6 @@ numpy==1.26.4
 pandas==2.1.4
 plotly==6.0.0
 scikit-learn==1.5.2
+streamlit==1.41.1
 torch==2.2.2
 tqdm==4.66.5

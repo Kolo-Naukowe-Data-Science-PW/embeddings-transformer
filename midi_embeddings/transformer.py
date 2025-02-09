@@ -83,7 +83,7 @@ class MIDITransformerEncoder(nn.Module):
             tokens (tensor): Input song tokens.
 
         Returns:
-            tensor_: Song embedding.
+            tensor: Song embedding.
         """
         tokens = tokens.unsqueeze(0)  # Add batch dimension (batch_size=1)
 

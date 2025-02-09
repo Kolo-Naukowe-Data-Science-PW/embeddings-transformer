@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import torch
 
 from midi_embeddings.train import evaluate, train_model
@@ -21,6 +23,10 @@ def main():
     }
 
     MODEL_NAME = "model"
+    TOKENIZER_PATH = Path("awesome.json")
+    if not TOKENIZER_PATH.exists():
+        print(f"Tokenizer at {TOKENIZER_PATH} not found. Training required. Please wait.")
+        TOKENIZER_PATH = None
 
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     torch.manual_seed(42)
@@ -29,13 +35,13 @@ def main():
     train_dataset = MIDIDatasetPresaved(
         split="train",
         max_seq_len=config["max_seq_len"],
-        tokenizer_path="awesome.json",
+        tokenizer_path=TOKENIZER_PATH,
     )
 
     val_dataset = MIDIDatasetPresaved(
         split="validation",
         max_seq_len=config["max_seq_len"],
-        tokenizer_path="awesome.json",
+        tokenizer_path=TOKENIZER_PATH,
     )
 
     # Initialize model
@@ -50,11 +56,11 @@ def main():
 
     # Train the model
     model = train_model(
-        model,
-        train_dataset,
-        val_dataset,
-        config,
-        DEVICE,
+        model=model,
+        train_dataset=train_dataset,
+        val_dataset=val_dataset,
+        config=config,
+        device=DEVICE,
         model_name=MODEL_NAME,
     )
 
@@ -67,7 +73,7 @@ def main():
     test_dataset = MIDIDatasetDynamic(
         split="test",
         max_seq_len=config["max_seq_len"],
-        tokenizer_path="awesome.json",
+        tokenizer_path=TOKENIZER_PATH,
     )
 
     test_loss, perplexity = evaluate(model, test_dataset, DEVICE)
@@ -75,7 +81,12 @@ def main():
 
     # Visualize embeddings for whole dataset
     print("Visualizing embeddings...")
-    visualize_embeddings(model, DEVICE, max_seq_len=config["max_seq_len"], file_name="embeddings.html")
+    visualize_embeddings(
+        model=model,
+        device=DEVICE,
+        max_seq_len=config["max_seq_len"],
+        file_name="embeddings.html",
+    )
 
 
 if __name__ == "__main__":
