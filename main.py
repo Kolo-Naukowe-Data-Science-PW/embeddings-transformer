@@ -14,15 +14,15 @@ def main():
         "max_seq_len": 2048,
         "embed_dim": 384,
         "nhead": 6,
-        "num_layers": 6,
+        "num_layers": 4,
         "batch_size": 8,
         "epochs": 50,
         "learning_rate": 3e-4,
-        "weight_decay": 0.1,
+        "weight_decay": 0.01,
         "dropout": 0.2,
     }
 
-    MODEL_NAME = "model"
+    MODEL_NAME = "embed_model"
     TOKENIZER_PATH = Path("awesome.json")
     if not TOKENIZER_PATH.exists():
         print(f"Tokenizer at {TOKENIZER_PATH} not found. Training required. Please wait.")
@@ -31,17 +31,24 @@ def main():
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     torch.manual_seed(42)
 
-    # Initialize datasets
     train_dataset = MIDIDatasetPresaved(
         split="train",
         max_seq_len=config["max_seq_len"],
         tokenizer_path=TOKENIZER_PATH,
     )
+    TOKENIZER_PATH = train_dataset.tokenizer_path
 
     val_dataset = MIDIDatasetPresaved(
         split="validation",
         max_seq_len=config["max_seq_len"],
         tokenizer_path=TOKENIZER_PATH,
+    )
+
+    viz_dataset = MIDIDatasetPresaved(
+        split="all",
+        max_seq_len=config["max_seq_len"],
+        tokenizer_path=TOKENIZER_PATH,
+        return_info=True,
     )
 
     # Initialize model
@@ -62,6 +69,9 @@ def main():
         config=config,
         device=DEVICE,
         model_name=MODEL_NAME,
+        wandb_project="midi-embeddings",
+        viz_dataset=viz_dataset,
+        viz_interval=2,
     )
 
     # Load the best model
@@ -85,7 +95,8 @@ def main():
         model=model,
         device=DEVICE,
         max_seq_len=config["max_seq_len"],
-        file_name="embeddings.html",
+        file_name="final_embeddings.html",
+        dataset=viz_dataset,
     )
 
 

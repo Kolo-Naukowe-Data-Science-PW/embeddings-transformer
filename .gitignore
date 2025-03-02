@@ -1,5 +1,6 @@
 data
 models
+wandb
 __pycache__
 .DS_Store
 *.html
