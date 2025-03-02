@@ -6,3 +6,5 @@ __pycache__
 *.html
 *.json
 *.pth
+outputs
+test.py

@@ -15,7 +15,7 @@ train:
 
 dataset:
   tokenizer_path: "awesome.json"
-  limit: None
+  limit: null
 
 wandb:
   project: "midi-embeddings"
