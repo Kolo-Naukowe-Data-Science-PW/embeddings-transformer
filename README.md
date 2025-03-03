@@ -7,10 +7,10 @@ This project implements a Transformer-based model for generating embeddings from
 ### W&B
 `https://www.wandb.ai/knds-midi/midi-embeddings`
 
-## Main Script: `script.py`
+## Main Script: `midi_embeddings.py`
 
 ### Purpose
-The `script.py` script serves as the primary entry point for training and evaluating a MIDI embedding model using Hydra for configuration management. When a user runs this script, the following will happen:
+The `midi_embeddings.py` script serves as the primary entry point for training and evaluating a MIDI embedding model using Hydra for configuration management. When a user runs this script, the following will happen:
 
 ### Workflow
 1. **Configuration Setup**
@@ -45,13 +45,19 @@ The `script.py` script serves as the primary entry point for training and evalua
 ### Example Usage
 ```bash
 # Run with default configuration
-python script.py
+python midi_embeddings.py
 
 # Override specific parameters
-python script.py train.batch_size=16 train.epochs=20
+python midi_embeddings.py train.batch_size=16 train.epochs=20
 
 # Use a different configuration file
-python script.py --config-name=large_model
+python midi_embeddings.py -cn another_config_file
+```
+
+## Evaluation mode
+For evaluation mode, run the script with `eval.yaml` config file as shown below:
+```bash
+python midi_embeddings.py -cn eval eval.model_path=path/to/your/model.pth
 ```
 
 ## Installation
@@ -74,21 +80,22 @@ The project uses Hydra for configuration management. Configuration files are loc
 ## Sample Configuration Structure
 ```yaml
 # Default configuration
+
 train:
   max_seq_len: 2048
   embed_dim: 384
-  nhead: 4
-  num_layers: 2
+  nhead: 6
+  num_layers: 4
   batch_size: 8
-  epochs: 10
-  learning_rate: 0.0003
-  weight_decay: 0.1
+  epochs: 50
+  learning_rate: 3e-4
+  weight_decay: 0.01
   dropout: 0.2
   model_name: "embed_model"
 
 dataset:
   tokenizer_path: "awesome.json"
-  limit: 100  # Limit dataset size for faster experimentation
+  limit: null
 
 wandb:
   project: "midi-embeddings"
