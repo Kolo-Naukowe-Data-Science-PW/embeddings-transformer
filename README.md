@@ -59,6 +59,7 @@ For evaluation mode, run the script with `eval.yaml` config file as shown below:
 ```bash
 python midi_embeddings.py -cn eval eval.model_path=path/to/your/model.pth
 ```
+This lets the user use an already trained model to evaluate on the test dataset and visualize the embeddings.
 
 ## Installation
 ```bash
