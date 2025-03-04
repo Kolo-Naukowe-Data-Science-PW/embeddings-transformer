@@ -1,0 +1,9 @@
+defaults:
+  - config
+  - _self_
+
+eval:
+  enabled: true
+  model_path: "${hydra:runtime.cwd}/models/embed_model.pth"  # Default path
+  visualize: true
+  output_file: "eval_embeddings.html"

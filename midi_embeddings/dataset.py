@@ -145,6 +145,7 @@ class MIDIDatasetPresaved(Dataset):
         self.max_seq_len = max_seq_len
         self.return_info = return_info
         self.save_path = f"data/{split}_tokenized_{max_seq_len}_{limit if limit is not None else 'full'}.json"
+        self._tokenizer_path = tokenizer_path
 
         if not Path(self.save_path).parent.exists():
             Path(self.save_path).parent.mkdir(parents=True)
@@ -172,6 +173,7 @@ class MIDIDatasetPresaved(Dataset):
             self.tokenizer = AwesomeMidiTokenizer(base_tokenizer=base_tokenizer)
             self.tokenizer.train(self.dataset)
             self.tokenizer.save_tokenizer("awesome.json")
+            self._tokenizer_path = "awesome.json"
         else:
             self.tokenizer = AwesomeMidiTokenizer(base_tokenizer=base_tokenizer).from_file(tokenizer_path)
 
@@ -260,6 +262,11 @@ class MIDIDatasetPresaved(Dataset):
     def vocab_size(self) -> int:
         """Return the vocabulary size of the tokenizer."""
         return self.tokenizer.vocab_size
+
+    @property
+    def tokenizer_path(self) -> str:
+        """Return the path to the tokenizer"""
+        return self._tokenizer_path
 
 
 # Test the dataset classes

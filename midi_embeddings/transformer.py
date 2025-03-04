@@ -77,29 +77,28 @@ class MIDITransformerEncoder(nn.Module):
         return self.output_layer(x)
 
     def get_embeddings(self, tokens: torch.Tensor) -> torch.Tensor:
-        """Get song embedding by applying mean pooling to the transformer hidden states
+        """Get song embeddings by applying mean pooling to the transformer hidden states
 
         Args:
-            tokens (tensor): Input song tokens.
+            tokens (tensor): Input song tokens of shape [batch_size, seq_len]
 
         Returns:
-            tensor: Song embedding.
+            tensor: Song embeddings of shape [batch_size, embed_dim]
         """
-        tokens = tokens.unsqueeze(0)  # Add batch dimension (batch_size=1)
+        # Create positions tensor: [batch_size, seq_len]
+        batch_size, seq_len = tokens.size()
+        positions = torch.arange(0, seq_len, device=tokens.device).unsqueeze(0).expand(batch_size, -1)
 
-        # Create positions tensor: [batch_size, seq_len] (0, 1, 2, ..., seq_len-1)
-        positions = torch.arange(0, tokens.size(1), device=tokens.device).unsqueeze(0)
-
-        # Pass tokens through the model to get hidden states (without the output layer)
+        # Pass tokens through the model
         with torch.no_grad():
             hidden_states = self.encoder(
                 self.token_embedding(tokens) + self.position_embedding(positions)
-            )  # Shape: [1, seq_len, embed_dim]
+            )  # Shape: [batch_size, seq_len, embed_dim]
 
-        # Mean pooling across sequence length (dim=1) to get a fixed-size embedding
-        song_embedding = hidden_states.mean(dim=1)  # Shape: [1, embed_dim]
+        # Mean pooling across sequence length (dim=1)
+        embeddings = hidden_states.mean(dim=1)  # Shape: [batch_size, embed_dim]
 
-        return song_embedding
+        return embeddings
 
 
 def generate_causal_mask(seq_len: int, device: torch.device) -> torch.Tensor:
