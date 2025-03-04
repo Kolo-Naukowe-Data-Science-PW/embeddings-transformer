@@ -16,13 +16,12 @@ from typing import Union
 from datetime import datetime
 
 import torch
+import wandb
 import torch.nn as nn
 from tqdm import tqdm
 import torch.optim as optim
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import Dataset, DataLoader
-
-import wandb
 
 if torch.cuda.is_available():
     from torch.amp import GradScaler
@@ -174,7 +173,7 @@ def train_model(
     prev_val_loss: float = float("inf"),
     wandb_project: str = None,
     viz_dataset: Dataset = None,
-    viz_interval: int = 5,
+    viz_interval: int = 2,
 ) -> nn.Module:
     """Trains the model using defined configuration with wandb logging
 
@@ -191,7 +190,7 @@ def train_model(
         prev_val_loss (float, optional): Previous best validation loss. Defaults to float("inf").
         wandb_project (str, optional): W&B project name to log to. If None, W&B is disabled.
         viz_dataset (Dataset, optional): Dataset for embedding visualization.
-        viz_interval (int, optional): How often to log embeddings to W&B. Defaults to 5.
+        viz_interval (int, optional): How often to log embeddings to W&B. Defaults to 2.
 
     Returns:
         nn.Module: Trained model.
@@ -255,6 +254,7 @@ def train_model(
             model=model,
             dataset=viz_dataset,
             device=device,
+            viz_interval=viz_interval,
         )
 
     for epoch in range(start_epoch, start_epoch + config["epochs"]):
@@ -293,7 +293,7 @@ def train_model(
             )
 
             if visualizer:
-                viz_data = visualizer.log_embeddings(epoch + 1, viz_interval)
+                viz_data = visualizer.log_embeddings(epoch + 1)
                 if viz_data:
                     wandb.log(
                         {

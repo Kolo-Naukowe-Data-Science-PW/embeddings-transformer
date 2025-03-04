@@ -239,15 +239,22 @@ def visualize_embeddings(
 
 
 class EmbeddingVisualizer:
-    """Handles embedding visualization with UMAP alignment and animation"""
+    """Handles embedding visualization with tSNE alignment and animation"""
 
-    def __init__(self, model: nn.Module, dataset: Dataset, device: torch.device):
+    def __init__(
+        self,
+        model: nn.Module,
+        dataset: Dataset,
+        device: torch.device,
+        viz_interval: int = 2,
+    ):
         self.model = model
         self.dataset = dataset
         self.device = device
         self.embeddings_history = []
         self.titles = []
         self.composers = []
+        self.viz_interval = viz_interval
 
     def _calculate_embeddings(self) -> tuple:
         """Calculate raw embeddings and reduce dimensions"""
@@ -276,19 +283,25 @@ class EmbeddingVisualizer:
         return embeddings_2d, titles, composers
 
     def create_animation(self, file_name: str = "embedding_evolution.html") -> None:
-        """Create animated plot of embedding evolution"""
+        """Create animated plot of embedding evolution
+
+        Args:
+            file_name: Name of the output file
+        """
         if not self.embeddings_history:
             raise ValueError("No embeddings history to animate")
 
         df = pd.DataFrame()
         for epoch, emb in enumerate(self.embeddings_history):
+            epoch = epoch * self.viz_interval
+
             epoch_df = pd.DataFrame(
                 {
                     "x": emb[:, 0],
                     "y": emb[:, 1],
                     "title": self.titles,
                     "composer": self.composers,
-                    "epoch": [f"Epoch {epoch+1}"] * len(emb),
+                    "epoch": [epoch + 1] * len(emb),
                 }
             )
             df = pd.concat([df, epoch_df])
@@ -309,9 +322,13 @@ class EmbeddingVisualizer:
 
         fig.write_html(file_name)
 
-    def log_embeddings(self, epoch: int, viz_interval: int = 5) -> dict:
-        """Log embeddings for current epoch (to be called from training loop)"""
-        if (epoch % viz_interval == 0) or (epoch == 1):
+    def log_embeddings(self, epoch: int) -> dict:
+        """Log embeddings for current epoch (to be called from training loop)
+
+        Args:
+            epoch: Current epoch number
+        """
+        if (epoch % self.viz_interval == 0) or (epoch == 1):
             embeddings_2d, self.titles, self.composers = self._calculate_embeddings()
             self.embeddings_history.append(embeddings_2d)
 
