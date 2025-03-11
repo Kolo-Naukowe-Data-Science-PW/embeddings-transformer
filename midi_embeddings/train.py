@@ -13,8 +13,10 @@ MIDI-based transformer model. It includes:
 
 from pathlib import Path
 from typing import Union
+from datetime import datetime
 
 import torch
+import wandb
 import torch.nn as nn
 from tqdm import tqdm
 import torch.optim as optim
@@ -24,6 +26,7 @@ from torch.utils.data import Dataset, DataLoader
 if torch.cuda.is_available():
     from torch.amp import GradScaler
 
+from midi_embeddings.visualize import EmbeddingVisualizer
 from midi_embeddings.transformer import generate_causal_mask
 
 
@@ -168,8 +171,11 @@ def train_model(
     scheduler: torch.optim.lr_scheduler._LRScheduler = None,
     start_epoch: int = 0,
     prev_val_loss: float = float("inf"),
+    wandb_project: str = None,
+    viz_dataset: Dataset = None,
+    viz_interval: int = 2,
 ) -> nn.Module:
-    """Trains the model using defined configuration
+    """Trains the model using defined configuration with wandb logging
 
     Args:
         model (nn.Module): Model for training
@@ -182,10 +188,26 @@ def train_model(
         scheduler (torch.optim.lr_scheduler, optional): Existing scheduler. Defaults to None.
         start_epoch (int, optional): Starting epoch for resuming training. Defaults to 0.
         prev_val_loss (float, optional): Previous best validation loss. Defaults to float("inf").
+        wandb_project (str, optional): W&B project name to log to. If None, W&B is disabled.
+        viz_dataset (Dataset, optional): Dataset for embedding visualization.
+        viz_interval (int, optional): How often to log embeddings to W&B. Defaults to 2.
 
     Returns:
         nn.Module: Trained model.
     """
+
+    # Initialize wandb
+    current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+    if wandb_project:
+        wandb.init(
+            project=wandb_project,
+            config=config,
+            entity="knds-midi",
+            name=f"run/{current_time}",
+            settings=wandb.Settings(_disable_stats=True),
+        )
+
     # Create dataloaders
     train_loader = DataLoader(
         train_dataset,
@@ -226,6 +248,15 @@ def train_model(
     # Training loop
     best_val_loss = prev_val_loss
 
+    visualizer = None
+    if viz_dataset:
+        visualizer = EmbeddingVisualizer(
+            model=model,
+            dataset=viz_dataset,
+            device=device,
+            viz_interval=viz_interval,
+        )
+
     for epoch in range(start_epoch, start_epoch + config["epochs"]):
         # Training phase
         train_loss = train_one_epoch(
@@ -249,6 +280,29 @@ def train_model(
             f"Perplexity: {perplexity: .4f} "
         )
 
+        # Log to W&B
+        if wandb_project:
+            wandb.log(
+                {
+                    "train_loss": train_loss,
+                    "val_loss": val_loss,
+                    "perplexity": perplexity,
+                    "learning_rate": scheduler.get_last_lr()[0],
+                },
+                step=epoch + 1,
+            )
+
+            if visualizer:
+                viz_data = visualizer.log_embeddings(epoch + 1)
+                if viz_data:
+                    wandb.log(
+                        {
+                            "embeddings_viz": viz_data["embeddings_plot"],
+                            "epoch": epoch + 1,
+                        },
+                        step=epoch + 1,
+                    )
+
         Path("models").mkdir(exist_ok=True)
 
         # Save best model
@@ -266,6 +320,12 @@ def train_model(
                 f"models/{model_name}.pth",
             )
             print("New best model saved!")
+
+    if visualizer:
+        visualizer.create_animation()
+
+    if wandb_project:
+        wandb.finish()
 
     return model
 
