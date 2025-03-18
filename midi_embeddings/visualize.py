@@ -2,10 +2,10 @@
 Visualization Module (visualize.py)
 -----------------------------------
 This module provides tools for visualizing MIDI song embeddings using
-Plotly and t-SNE. It includes:
+Plotly and PCA. It includes:
 
 - `get_song_embedding`: Extracts embeddings from a trained model.
-- `prepare_embeddings`: Computes embeddings and reduces dimensions using t-SNE.
+- `prepare_embeddings`: Computes embeddings and reduces dimensions using PCA.
 - `plot_interactive`: Creates an interactive scatter plot.
 - `visualize_embeddings`: A utility function to load data, compute embeddings
   and visualize them.
@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 import torch.nn as nn
 import plotly.express as px
-from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
 from torch.utils.data import Dataset, DataLoader
 
 from midi_embeddings.transformer import MIDITransformerEncoder
@@ -46,51 +46,6 @@ def get_song_embedding(
     return song_embedding.cpu().numpy()
 
 
-# def prepare_embeddings(
-#     model: nn.Module,
-#     dataset: Dataset,
-#     device: torch.device,
-# ) -> tuple:
-#     """Generates embeddings for all songs in the dataset and performs t-SNE on them
-
-#     Args:
-#         model (nn.Module): Model to use for embedding generation.
-#         dataset (Dataset): Dataset containing the songs.
-#         device (torch.device): Device to perform the processing on.
-
-#     Returns:
-#         tuple: (embeddings array, song titles, composers)
-#     """
-#     song_embeddings = []
-#     song_titles = []
-#     composers = []
-
-#     # For each song: get embedding and store it with info
-#     for i in range(len(dataset)):
-#         song_tokens = dataset[i]["token_ids"]
-#         song_tokens = song_tokens.unsqueeze(0)  # add batch dimension
-#         embedding = get_song_embedding(
-#             model=model,
-#             song_tokens=song_tokens,
-#             device=device,
-#         )
-#         song_embeddings.append(embedding)
-
-#         info = dataset[i]["info"]
-
-#         song_titles.append(info["title"])
-#         composers.append(info.get("composer", "Unknown"))
-
-#     # Stack all embeddings into a single array
-#     embeddings_array = np.vstack(song_embeddings)
-
-#     # Perform t-SNE on the data
-#     tsne = TSNE(random_state=42)
-#     embeddings_2d = tsne.fit_transform(embeddings_array)
-
-#     return embeddings_2d, song_titles, composers
-
-
 def prepare_batched_embeddings(
     model: nn.Module,
     dataset: Dataset,
@@ -99,7 +54,7 @@ def prepare_batched_embeddings(
     reference_embeddings: np.ndarray = None,
     align: bool = False,
 ) -> tuple:
-    """Generates embeddings for all songs in the dataset and performs t-SNE on them
+    """Generates embeddings for all songs in the dataset and performs PCA on them
 
     Args:
         model (nn.Module): Model to use for embedding generation.
@@ -124,8 +79,8 @@ def prepare_batched_embeddings(
 
     raw_embeddings = np.vstack(song_embeddings)
 
-    tsne = TSNE(random_state=42)
-    embeddings_2d = tsne.fit_transform(raw_embeddings)
+    pca = PCA(n_components=2, random_state=42)
+    embeddings_2d = pca.fit_transform(raw_embeddings)
 
     song_titles = []
     composers = []
@@ -239,7 +194,7 @@ def visualize_embeddings(
 
 
 class EmbeddingVisualizer:
-    """Handles embedding visualization with tSNE alignment and animation"""
+    """Handles embedding visualization with PCA alignment and animation"""
 
     def __init__(
         self,
@@ -255,6 +210,7 @@ class EmbeddingVisualizer:
         self.titles = []
         self.composers = []
         self.viz_interval = viz_interval
+        self.pca = None
 
     def _calculate_embeddings(self) -> tuple:
         """Calculate raw embeddings and reduce dimensions"""
@@ -277,8 +233,11 @@ class EmbeddingVisualizer:
 
         raw_embeddings = np.vstack(all_embeddings)
 
-        tsne = TSNE(random_state=42)
-        embeddings_2d = tsne.fit_transform(raw_embeddings)
+        if self.pca is None:
+            self.pca = PCA(n_components=2, random_state=42)
+            embeddings_2d = self.pca.fit_transform(raw_embeddings)
+        else:
+            embeddings_2d = self.pca.transform(raw_embeddings)
 
         return embeddings_2d, titles, composers
 
