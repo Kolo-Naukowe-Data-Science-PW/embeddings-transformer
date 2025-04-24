@@ -9,16 +9,19 @@ Plotly and PCA. It includes:
 - `plot_interactive`: Creates an interactive scatter plot.
 - `visualize_embeddings`: A utility function to load data, compute embeddings
   and visualize them.
+- `EmbeddingVisualizer`: A class for handling embedding visualization with
+  PCA alignment and animation.
 """
-
 
 import torch
 import numpy as np
 import pandas as pd
 import torch.nn as nn
 import plotly.express as px
-from sklearn.decomposition import PCA
 from torch.utils.data import Dataset, DataLoader
+from sklearn.preprocessing import StandardScaler
+from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
 
 from midi_embeddings.transformer import MIDITransformerEncoder
 from midi_embeddings.dataset import MIDIDatasetDynamic, MIDIDatasetPresaved
@@ -51,8 +54,6 @@ def prepare_batched_embeddings(
     dataset: Dataset,
     device: torch.device,
     batch_size: int = 16,
-    reference_embeddings: np.ndarray = None,
-    align: bool = False,
 ) -> tuple:
     """Generates embeddings for all songs in the dataset and performs PCA on them
 
@@ -79,8 +80,8 @@ def prepare_batched_embeddings(
 
     raw_embeddings = np.vstack(song_embeddings)
 
-    pca = PCA(n_components=2, random_state=42)
-    embeddings_2d = pca.fit_transform(raw_embeddings)
+    viz = TSNE(n_components=2, random_state=42)
+    embeddings_2d = viz.fit_transform(raw_embeddings)
 
     song_titles = []
     composers = []
@@ -206,13 +207,15 @@ class EmbeddingVisualizer:
         self.model = model
         self.dataset = dataset
         self.device = device
+        self.raw_embeddings_history = []
         self.embeddings_history = []
         self.titles = []
         self.composers = []
         self.viz_interval = viz_interval
         self.pca = None
+        self.embeddings_2d = None
 
-    def _calculate_embeddings(self) -> tuple:
+    def _calculate_raw_embeddings(self) -> tuple:
         """Calculate raw embeddings and reduce dimensions"""
         dataloader = DataLoader(self.dataset, batch_size=16, shuffle=False)
         all_embeddings = []
@@ -220,39 +223,78 @@ class EmbeddingVisualizer:
         # Get embeddings
         for batch in dataloader:
             song_tokens = batch["token_ids"].to(self.device)
-            embeddings = self.model.get_embeddings(song_tokens)
+            with torch.no_grad():
+                embeddings = self.model.get_embeddings(song_tokens)
             all_embeddings.append(embeddings.cpu().numpy())
 
         # Process metadata
-        titles = []
-        composers = []
-        for i in range(len(self.dataset)):
-            info = self.dataset[i]["info"]
-            titles.append(info["title"])
-            composers.append(info.get("composer", "Unknown"))
+        if not self.titles:
+            for i in range(len(self.dataset)):
+                info = self.dataset[i]["info"]
+                self.titles.append(info["title"])
+                self.composers.append(info.get("composer", "Unknown"))
 
         raw_embeddings = np.vstack(all_embeddings)
 
-        if self.pca is None:
-            self.pca = PCA(n_components=2, random_state=42)
-            embeddings_2d = self.pca.fit_transform(raw_embeddings)
-        else:
-            embeddings_2d = self.pca.transform(raw_embeddings)
-
-        return embeddings_2d, titles, composers
+        return raw_embeddings
+    
+    def log_embeddings(self, epoch: int) -> dict:
+        """Log raw embeddings for current epoch"""
+        
+        if (epoch % self.viz_interval == 0) or (epoch == 1):
+            raw_embeddings = self._calculate_raw_embeddings()
+            self.raw_embeddings_history.append(raw_embeddings)
+            
+            scaler = StandardScaler()
+            normalized = scaler.fit_transform(raw_embeddings)
+            temp_pca = PCA(n_components=2, random_state=42)
+            temp_2d = temp_pca.fit_transform(normalized)
+            
+            fig = self._create_figure(temp_2d)
+            return {"embeddings_plot": fig}
+        return {}
+    
+    def _create_figure(self, embeddings_2d):
+        """Helper method to create a figure from 2D embeddings"""
+        return plot_interactive(
+            embeddings_2d=embeddings_2d, 
+            song_titles=self.titles, 
+            composers=self.composers, 
+            return_figure=True
+        )
+        
+    def finalize_embeddings(self):
+        """Process all stored embeddings after training is complete"""
+        if not self.raw_embeddings_history:
+            raise ValueError("No embeddings history to process")
+            
+        scaler = StandardScaler()
+        final_normalized = scaler.fit_transform(self.raw_embeddings_history[-1])
+        
+        # Fit PCA on the final embeddings
+        self.pca = PCA(n_components=2, random_state=42)
+        self.embeddings_2d = []
+        
+        final_2d = self.pca.fit_transform(final_normalized)
+        
+        # Then process all epochs 
+        for raw_emb in self.raw_embeddings_history:
+            normalized = scaler.transform(raw_emb)
+            
+            if np.array_equal(raw_emb, self.raw_embeddings_history[-1]):
+                self.embeddings_2d.append(final_2d)
+            else:
+                epoch_2d = self.pca.transform(normalized)
+                self.embeddings_2d.append(epoch_2d)
 
     def create_animation(self, file_name: str = "embedding_evolution.html") -> None:
-        """Create animated plot of embedding evolution
-
-        Args:
-            file_name: Name of the output file
-        """
-        if not self.embeddings_history:
-            raise ValueError("No embeddings history to animate")
+        """Create animated plot of embedding evolution after finalizing"""
+        if not self.embeddings_2d:
+            self.finalize_embeddings()
 
         df = pd.DataFrame()
-        for epoch, emb in enumerate(self.embeddings_history):
-            epoch = epoch * self.viz_interval
+        for epoch, emb in enumerate(self.embeddings_2d):
+            epoch_num = epoch * self.viz_interval
 
             epoch_df = pd.DataFrame(
                 {
@@ -260,7 +302,7 @@ class EmbeddingVisualizer:
                     "y": emb[:, 1],
                     "title": self.titles,
                     "composer": self.composers,
-                    "epoch": [epoch + 1] * len(emb),
+                    "epoch": [epoch_num + 1] * len(emb),
                 }
             )
             df = pd.concat([df, epoch_df])
@@ -281,31 +323,12 @@ class EmbeddingVisualizer:
 
         fig.write_html(file_name)
 
-    def log_embeddings(self, epoch: int) -> dict:
-        """Log embeddings for current epoch (to be called from training loop)
-
-        Args:
-            epoch: Current epoch number
-        """
-        if (epoch % self.viz_interval == 0) or (epoch == 1):
-            embeddings_2d, self.titles, self.composers = self._calculate_embeddings()
-            self.embeddings_history.append(embeddings_2d)
-
-            fig = self.plot_current_embeddings()
-            return {"embeddings_plot": fig, "embeddings_data": embeddings_2d}
-        return {}
-
     def plot_current_embeddings(self) -> px.scatter:
         """Plot current epoch's embeddings"""
-        if not self.embeddings_history:
-            embeddings_2d, self.titles, self.composers = self._calculate_embeddings()
-            self.embeddings_history.append(embeddings_2d)
+        if not self.embeddings_2d:
+            self.finalize_embeddings()
 
-        current_embeddings = self.embeddings_history[-1]
-
-        return plot_interactive(
-            embeddings_2d=current_embeddings, song_titles=self.titles, composers=self.composers, return_figure=True
-        )
+        return self._create_figure(self.embeddings_2d[-1])
 
 
 # Main function to run the visualization manually
